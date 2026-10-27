@@ -36,7 +36,8 @@ jobs:
         run: |
           docker build --pull --platform linux/arm64 -t ha-couchdb:arm64-update couchdb
           python3 scripts/smoke_test.py ha-couchdb:arm64-update
-      - name: Propose reviewed update
+      - name: Record tested update
+        id: proposal
         if: steps.upstream.outputs.new_version != ''
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
@@ -52,5 +53,15 @@ jobs:
             Updates the pinned official CouchDB image and HA app version together.
             Unit tests, native amd64 and emulated ARM64 real-container smoke tests passed before this PR was opened.
             Test run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            This PR is not automatically merged. Review upstream release notes and back up before upgrading.
-            The regular CI workflow also runs both architectures natively after merge and can be dispatched manually on this branch before merge.
+            This PR is automatically merged only after all proposed-version tests above pass.
+            The merge is restricted to the exact tested PR head commit.
+      - name: Merge tested upstream update
+        if: steps.proposal.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.proposal.outputs.pull-request-number }}
+          TESTED_HEAD: ${{ steps.proposal.outputs.pull-request-head-sha }}
+        run: |
+          test -n "$TESTED_HEAD"
+          gh pr merge "$PR_NUMBER" --squash --match-head-commit "$TESTED_HEAD"

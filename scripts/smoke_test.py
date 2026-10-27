@@ -60,7 +60,9 @@ def main():
                 last_status = status
                 if status == 200:
                     last_databases = json.loads(payload)
-                if status == 200 and {'_users', '_replicator', '_global_changes'} <= set(json.loads(payload)):
+                # CouchDB single_node creates these two databases. The optional
+                # global changes database is not needed by LiveSync.
+                if status == 200 and {'_users', '_replicator'} <= set(json.loads(payload)):
                     return
             except (OSError, ValueError):
                 pass

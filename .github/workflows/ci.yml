@@ -1,0 +1,43 @@
+name: Validate CouchDB
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s tests -v
+      - name: Check HA version matches the official image
+        run: |
+          python3 - <<'PY'
+          import pathlib, re
+          root = pathlib.Path('couchdb')
+          upstream = re.search(r'^FROM couchdb:([0-9.]+)$', (root / 'Dockerfile').read_text(), re.M).group(1)
+          version = re.search(r'^version: "([^"]+)"$', (root / 'config.yaml').read_text(), re.M).group(1)
+          assert version.startswith(upstream + '-'), (upstream, version)
+          PY
+  container:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            architecture: amd64
+          - runner: ubuntu-24.04-arm
+            architecture: aarch64
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build official-image wrapper
+        run: docker build --pull -t ha-couchdb:test couchdb
+      - name: Exercise real CouchDB
+        run: python3 scripts/smoke_test.py ha-couchdb:test

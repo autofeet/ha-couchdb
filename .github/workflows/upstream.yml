@@ -26,6 +26,16 @@ jobs:
       - name: Test proposed update
         if: steps.upstream.outputs.new_version != ''
         run: python3 scripts/smoke_test.py ha-couchdb:update
+      - name: Enable ARM64 validation
+        if: steps.upstream.outputs.new_version != ''
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        with:
+          platforms: arm64
+      - name: Build and test ARM64 update
+        if: steps.upstream.outputs.new_version != ''
+        run: |
+          docker build --pull --platform linux/arm64 -t ha-couchdb:arm64-update couchdb
+          python3 scripts/smoke_test.py ha-couchdb:arm64-update
       - name: Propose reviewed update
         if: steps.upstream.outputs.new_version != ''
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
@@ -40,7 +50,7 @@ jobs:
           title: "Update official CouchDB to ${{ steps.upstream.outputs.new_version }}"
           body: |
             Updates the pinned official CouchDB image and HA app version together.
-            Unit tests and the amd64 real-container smoke test passed before this PR was opened.
+            Unit tests, native amd64 and emulated ARM64 real-container smoke tests passed before this PR was opened.
             Test run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
             This PR is not automatically merged. Review upstream release notes and back up before upgrading.
-            The regular CI workflow also runs after merge and can be run manually on this branch for aarch64 validation.
+            The regular CI workflow also runs both architectures natively after merge and can be dispatched manually on this branch before merge.

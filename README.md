@@ -14,6 +14,9 @@
 5. 启动，启用“开机启动”和看门狗。API 地址为 `http://HA地址:5984/`，管理界面为 `http://HA地址:5984/_utils/`。
 6. 在 LiveSync 中配置服务器地址、账号、密码和数据库名称，运行其连接与配置检查。
 
+在应用“信息”页打开“显示在侧边栏”，左侧 **CouchDB** 会在 HA 内打开 Fauxton 管理页面。
+管理入口经过 HA 登录校验，无需再次登录 CouchDB；仅接受 Supervisor 内部连接，不额外开放管理端口。
+
 移动端使用 HTTPS 地址；在已有反向代理上将专用域名转发到 HA 的 5984 端口。
 HA 自身的 HTTPS 地址或远程访问服务不会自动代理 CouchDB。不要把未加密的 5984 直接暴露到公网。
 
@@ -51,3 +54,5 @@ GitHub CI 在原生 amd64 / aarch64 上构建并检查认证、CORS、系统数�
 测试通过不代表已经在你的 HA 设备安装或完成真实 LiveSync 数据迁移。
 
 上游：[Apache CouchDB 镜像](https://hub.docker.com/_/couchdb) · [Self-hosted LiveSync](https://github.com/vrtmrz/obsidian-livesync)
+
+图标使用 [Apache Fauxton 的 CouchDB 原始图标](https://github.com/apache/couchdb-fauxton/blob/main/assets/img/couchdb-logo.png)。Apache CouchDB 与其标识属于 Apache Software Foundation；本封装不是官方发行的 HA 应用。

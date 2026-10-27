@@ -79,6 +79,6 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (ValueError, OSError, configparser.Error):
-        print('CouchDB startup failed. Check HA options and persistent storage; no credential values are logged.', file=sys.stderr)
+    except (ValueError, OSError, configparser.Error) as error:
+        print(f'CouchDB startup failed ({type(error).__name__}). Check HA options and persistent storage; no credential values are logged.', file=sys.stderr)
         sys.exit(1)

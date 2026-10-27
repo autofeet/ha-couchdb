@@ -103,8 +103,8 @@ def main():
         assert request('/vault/note')[0] == 200
         username, password = old_username, old_password
         assert request('/vault/note')[0] == 401
-        processes = docker('top', name, '-eo', 'uid,args')
-        assert any(line.strip().startswith('5984 ') and 'beam.smp' in line for line in processes.splitlines()), 'Erlang must run as CouchDB uid 5984'
+        processes = docker('top', name, '-eo', 'pid,uid,args')
+        assert any(len(line.split()) > 2 and line.split()[1] == '5984' and 'beam.smp' in line for line in processes.splitlines()), 'Erlang must run as CouchDB uid 5984'
         print('PASS: auth, CORS, system DBs, container replacement, retained config and credential rotation')
     except Exception:
         # Never dump configuration or HA options into CI logs.

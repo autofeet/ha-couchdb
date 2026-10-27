@@ -38,7 +38,8 @@ class ConfigurationTests(unittest.TestCase):
     def test_rejects_invalid_values_without_leaking_them(self):
         invalid = [('', 'secret'), ('admin', ''), ('admin\n[bad]', 'secret'),
                    ('admin', 'secret\ninjection'), ('admin', ' secret'),
-                   ('admin', '-pbkdf2:not-a-password'), ('admin', 'abc\x00def')]
+                   ('admin', '-pbkdf2:not-a-password'), ('admin', 'abc\x00def'),
+                   ('admin', ';comment-password'), ('admin', 'secret ;suffix')]
         for username, password in invalid:
             with self.subTest(username=username):
                 with self.assertRaises(ValueError) as raised:

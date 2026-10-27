@@ -1,0 +1,24 @@
+name: CouchDB
+version: "3.5.3-1"
+slug: couchdb
+description: Official Apache CouchDB with persistent storage and Obsidian LiveSync defaults
+url: https://github.com/autofeet/ha-couchdb/tree/main/couchdb
+arch:
+  - amd64
+  - aarch64
+startup: services
+boot: auto
+init: false
+timeout: 120
+ports:
+  5984/tcp: 5984
+ports_description:
+  5984/tcp: CouchDB HTTP API (use an HTTPS reverse proxy for remote access)
+webui: http://[HOST]:[PORT:5984]/_utils/
+watchdog: tcp://[HOST]:5984
+options:
+  username: sync_admin
+  password: ""
+schema:
+  username: match(^[A-Za-z][A-Za-z0-9_-]{0,63}$)
+  password: password

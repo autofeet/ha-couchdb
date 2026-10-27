@@ -21,6 +21,7 @@ def main():
     suffix = secrets.token_hex(5)
     name = f'ha-couchdb-test-{suffix}'
     volume = f'ha-couchdb-test-{suffix}'
+    network = f'ha-couchdb-test-{suffix}'
     username, password = 'test_admin', secrets.token_urlsafe(24)
     url = ''
 
@@ -50,7 +51,8 @@ def main():
     def start():
         nonlocal url
         docker('run', '-d', '--name', name, '-v', f'{volume}:/data',
-               '-p', '127.0.0.1::5984', args.image)
+               '--network', network, '--ip', '172.30.32.3',
+               '-p', '127.0.0.1::5984', '-p', '127.0.0.1::8099', args.image)
         port = docker('port', name, '5984/tcp').rsplit(':', 1)[1]
         url = f'http://127.0.0.1:{port}'
         last_status, last_databases = None, []
@@ -71,6 +73,7 @@ def main():
 
     docker('volume', 'create', volume)
     try:
+        docker('network', 'create', '--subnet', '172.30.32.0/24', network)
         set_options()
         start()
         assert request('/_all_dbs', authenticated=False)[0] == 401
@@ -86,6 +89,39 @@ def main():
         assert headers.get('Access-Control-Allow-Origin') == 'app://obsidian.md'
         assert headers.get('Access-Control-Allow-Credentials') == 'true'
         assert request('/_node/_local/_config/custom/retained', 'PUT', 'keep-me')[0] == 200
+
+        # A real Supervisor-shaped client exercises the private ingress listener.
+        ingress_check = '''import json, urllib.request, urllib.error
+base = 'http://172.30.32.3:8099'
+try:
+    urllib.request.urlopen(base + '/_utils/')
+    raise AssertionError('Unidentified ingress session was accepted')
+except urllib.error.HTTPError as error:
+    assert error.code == 403
+headers = {'X-Remote-User-Id': 'ci-test-user', 'X-Ingress-Path': '/api/hassio_ingress/test'}
+def get(path):
+    return urllib.request.urlopen(urllib.request.Request(base + path, headers=headers))
+with get('/_utils/') as response:
+    assert response.status == 200
+    assert '<html' in response.read().decode().lower()
+    assert response.headers['X-Frame-Options'] == 'SAMEORIGIN'
+with get('/_session') as response:
+    session = json.load(response)
+    assert '_admin' in session['userCtx']['roles']
+with get('/vault/_all_docs') as response:
+    assert json.load(response)['total_rows'] == 1
+print('PASS: private ingress identity, Fauxton HTML, framing, admin session and database access')
+'''
+        print(docker('run', '--rm', '--network', network, '--ip', '172.30.32.2',
+                     '--entrypoint', 'python3', args.image, '-c', ingress_check))
+        ingress_port = docker('port', name, '8099/tcp').rsplit(':', 1)[1]
+        try:
+            urllib.request.urlopen(urllib.request.Request(
+                f'http://127.0.0.1:{ingress_port}/_utils/',
+                headers={'X-Remote-User-Id': 'untrusted-source'}))
+            raise AssertionError('Non-Supervisor ingress source was accepted')
+        except urllib.error.HTTPError as error:
+            assert error.code == 403
 
         # Recreate rather than merely restart: image updates replace containers.
         docker('stop', '-t', '120', name)
@@ -115,6 +151,7 @@ def main():
     finally:
         subprocess.run(['docker', 'rm', '-f', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(['docker', 'volume', 'rm', volume], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['docker', 'network', 'rm', network], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 if __name__ == '__main__':

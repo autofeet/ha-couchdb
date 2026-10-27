@@ -53,15 +53,19 @@ def main():
                '-p', '127.0.0.1::5984', args.image)
         port = docker('port', name, '5984/tcp').rsplit(':', 1)[1]
         url = f'http://127.0.0.1:{port}'
-        for _ in range(120):
+        last_status, last_databases = None, []
+        for _ in range(60):
             try:
                 status, payload, _ = request('/_all_dbs')
+                last_status = status
+                if status == 200:
+                    last_databases = json.loads(payload)
                 if status == 200 and {'_users', '_replicator', '_global_changes'} <= set(json.loads(payload)):
                     return
             except (OSError, ValueError):
                 pass
             time.sleep(1)
-        raise AssertionError('CouchDB failed to become ready with system databases')
+        raise AssertionError(f'CouchDB not ready: HTTP={last_status}, databases={last_databases}')
 
     docker('volume', 'create', volume)
     try:
@@ -103,6 +107,8 @@ def main():
     except Exception:
         # Never dump configuration or HA options into CI logs.
         print('Container test failed; inspect the failed assertion. Credentials are not logged.')
+        logs = subprocess.run(['docker', 'logs', '--tail', '60', name], capture_output=True, text=True)
+        print((logs.stdout + logs.stderr).replace(password, '[redacted]'))
         raise
     finally:
         subprocess.run(['docker', 'rm', '-f', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

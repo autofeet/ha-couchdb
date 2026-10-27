@@ -15,8 +15,9 @@ def render_config(options, existing=''):
         raise ValueError('Username must start with a letter and contain only letters, digits, _ or -.')
     if (not isinstance(password, str) or not password or password != password.strip()
             or any(ord(c) < 32 or ord(c) == 127 for c in password)
-            or password.startswith(('-pbkdf2', '-hashed-'))):
-        raise ValueError('Set a nonempty password without control characters, edge whitespace or reserved hash prefixes.')
+            or password.startswith(('-pbkdf2', '-hashed-', ';'))
+            or re.search(r'\s;', password)):
+        raise ValueError('Set a nonempty password without control characters, edge whitespace, INI comment syntax or reserved hash prefixes.')
 
     config = configparser.ConfigParser(interpolation=None, delimiters=('=',), strict=False)
     config.optionxform = str

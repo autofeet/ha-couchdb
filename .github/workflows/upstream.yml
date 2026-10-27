@@ -1,0 +1,46 @@
+name: Check official CouchDB updates
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: couchdb-upstream-update
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - run: python3 -m unittest discover -s tests -v
+      - name: Check official stable tags
+        id: upstream
+        run: python3 scripts/check_upstream.py --apply
+      # GITHUB_TOKEN-created PRs do not trigger pull_request workflows, so test
+      # the proposed version here before opening the PR and include this run.
+      - name: Build proposed update
+        if: steps.upstream.outputs.new_version != ''
+        run: docker build --pull -t ha-couchdb:update couchdb
+      - name: Test proposed update
+        if: steps.upstream.outputs.new_version != ''
+        run: python3 scripts/smoke_test.py ha-couchdb:update
+      - name: Propose reviewed update
+        if: steps.upstream.outputs.new_version != ''
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          branch: automation/couchdb-upstream
+          delete-branch: true
+          add-paths: |
+            couchdb/Dockerfile
+            couchdb/config.yaml
+            couchdb/CHANGELOG.md
+          commit-message: "Update official CouchDB to ${{ steps.upstream.outputs.new_version }}"
+          title: "Update official CouchDB to ${{ steps.upstream.outputs.new_version }}"
+          body: |
+            Updates the pinned official CouchDB image and HA app version together.
+            Unit tests and the amd64 real-container smoke test passed before this PR was opened.
+            Test run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            This PR is not automatically merged. Review upstream release notes and back up before upgrading.
+            The regular CI workflow also runs after merge and can be run manually on this branch for aarch64 validation.
